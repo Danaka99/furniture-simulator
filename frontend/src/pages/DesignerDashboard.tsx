@@ -195,19 +195,15 @@ const DesignerDashboardContent = () => {
     console.log("Adding furniture:", furniture);
     const newElement = {
       id: crypto.randomUUID(),
-      type: furniture.category.toLowerCase() as
-        | "table"
-        | "chair"
-        | "sofa"
-        | "bed"
-        | "cabinet"
-        | "lamp",
-      position: { x: 0, y: 0, z: 0 },
+      type: furniture.category.toLowerCase(),
+      position: { x: 0.5, y: 0, z: 0.5 },
       rotation: { x: 0, y: 0, z: 0 },
       scale: { x: 1, y: 1, z: 1 },
       color: "#FFFFFF",
       shade: 0,
     };
+
+    console.log("Created new element:", newElement);
 
     const updatedDesign = {
       ...currentDesign,

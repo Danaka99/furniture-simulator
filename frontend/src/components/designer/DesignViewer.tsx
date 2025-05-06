@@ -178,9 +178,15 @@ const DesignViewer: React.FC<DesignViewerProps> = ({
       Promise.all(
         design.elements.map(async (element) => {
           const furnitureTemplate = FURNITURE_CATALOG.find(
-            (f) => f.category.toLowerCase() === element.type
+            (f) => f.category.toLowerCase() === element.type.toLowerCase()
           );
-          if (!furnitureTemplate) return;
+          if (!furnitureTemplate) {
+            console.warn(
+              `No furniture template found for type: ${element.type}. Available categories:`,
+              FURNITURE_CATALOG.map((f) => f.category)
+            );
+            return;
+          }
 
           try {
             const model = await modelLoader.loadModel(
@@ -458,7 +464,7 @@ const DesignViewer: React.FC<DesignViewerProps> = ({
       canvas.height = containerRef.current.clientHeight;
       containerRef.current.appendChild(canvas);
 
-      // Calculate scale factor
+      // Calculate scale factor with proper aspect ratio handling
       const scale =
         Math.min(
           canvas.width / design.room.width,
@@ -478,68 +484,215 @@ const DesignViewer: React.FC<DesignViewerProps> = ({
         design.room.length * scale
       );
 
-      // Draw grid
-      ctx.strokeStyle = "#cccccc";
-      ctx.lineWidth = 1;
+      // Draw grid with improved visibility
+      ctx.strokeStyle = "#e0e0e0";
+      ctx.lineWidth = 0.5;
       const gridSize = 0.5; // 0.5m grid
+      const roomLeft = (canvas.width - design.room.width * scale) / 2;
+      const roomTop = (canvas.height - design.room.length * scale) / 2;
+
+      // Draw vertical grid lines
       for (let x = 0; x <= design.room.width; x += gridSize) {
-        const px = (canvas.width - design.room.width * scale) / 2 + x * scale;
+        const px = roomLeft + x * scale;
         ctx.beginPath();
-        ctx.moveTo(px, 0);
-        ctx.lineTo(px, canvas.height);
-        ctx.stroke();
-      }
-      for (let y = 0; y <= design.room.length; y += gridSize) {
-        const py = (canvas.height - design.room.length * scale) / 2 + y * scale;
-        ctx.beginPath();
-        ctx.moveTo(0, py);
-        ctx.lineTo(canvas.width, py);
+        ctx.moveTo(px, roomTop);
+        ctx.lineTo(px, roomTop + design.room.length * scale);
         ctx.stroke();
       }
 
-      // Draw furniture
-      design.elements.forEach((element) => {
+      // Draw horizontal grid lines
+      for (let z = 0; z <= design.room.length; z += gridSize) {
+        const pz = roomTop + z * scale;
+        ctx.beginPath();
+        ctx.moveTo(roomLeft, pz);
+        ctx.lineTo(roomLeft + design.room.width * scale, pz);
+        ctx.stroke();
+      }
+
+      // Draw furniture with improved rendering
+      // First sort elements by position for proper layering (objects closer to bottom/front should render on top)
+      const sortedElements = [...design.elements].sort((a, b) => {
+        // Sort by z position (depth) so elements closer to viewer render on top
+        return a.position.z - b.position.z;
+      });
+
+      sortedElements.forEach((element) => {
+        // Find matching furniture template with case-insensitive comparison
         const furnitureTemplate = FURNITURE_CATALOG.find(
-          (f) => f.category.toLowerCase() === element.type
+          (f) => f.category.toLowerCase() === element.type.toLowerCase()
         );
-        if (!furnitureTemplate) return;
-
-        // Calculate dimensions and position
-        const width =
-          furnitureTemplate.defaultDimensions.width * scale * element.scale.x;
-        const height =
-          furnitureTemplate.defaultDimensions.length * scale * element.scale.z;
-        const x =
-          (canvas.width - design.room.width * scale) / 2 +
-          element.position.x * design.room.width * scale;
-        const y =
-          (canvas.height - design.room.length * scale) / 2 +
-          element.position.z * design.room.length * scale;
-
-        // Draw furniture
-        ctx.save();
-        ctx.translate(x + width / 2, y + height / 2);
-        ctx.rotate(element.rotation.y);
-
-        // Fill and stroke
-        ctx.fillStyle = element.color;
-        ctx.fillRect(-width / 2, -height / 2, width, height);
-
-        // Highlight selected element
-        if (element.id === selectedElement) {
-          ctx.strokeStyle = "#ff0000";
-          ctx.lineWidth = 2;
-          ctx.strokeRect(-width / 2, -height / 2, width, height);
+        if (!furnitureTemplate) {
+          console.warn(
+            `No furniture template found for type: ${element.type}. Available categories:`,
+            FURNITURE_CATALOG.map((f) => f.category)
+          );
+          return;
         }
 
-        // Draw label
-        ctx.fillStyle = "#000000";
-        ctx.font = "12px Arial";
-        ctx.textAlign = "center";
-        ctx.fillText(furnitureTemplate.name, 0, 0);
+        // Calculate dimensions in meters and convert to pixels
+        const width =
+          furnitureTemplate.defaultDimensions.width * scale * element.scale.x;
+        const length =
+          furnitureTemplate.defaultDimensions.length * scale * element.scale.z;
+
+        // Calculate room offset (to center the room in the canvas)
+        const roomOffsetX = (canvas.width - design.room.width * scale) / 2;
+        const roomOffsetZ = (canvas.height - design.room.length * scale) / 2;
+
+        // Calculate furniture position in room coordinates
+        const roomX = element.position.x * design.room.width * scale;
+        const roomZ = element.position.z * design.room.length * scale;
+
+        // Calculate final screen coordinates (centered)
+        const x = roomOffsetX + roomX;
+        const z = roomOffsetZ + roomZ;
+
+        // Draw furniture with enhanced depth effect
+        ctx.save();
+        ctx.translate(x, z);
+        ctx.rotate(element.rotation.y);
+
+        // Draw shadow
+        ctx.fillStyle = "rgba(0, 0, 0, 0.15)";
+        ctx.fillRect(-width / 2, -length / 2, width, length);
+
+        // Draw furniture with gradient
+        const gradient = ctx.createLinearGradient(
+          -width / 2,
+          -length / 2,
+          width / 2,
+          length / 2
+        );
+        gradient.addColorStop(0, element.color);
+        gradient.addColorStop(1, adjustColor(element.color, -10));
+        ctx.fillStyle = gradient;
+        ctx.fillRect(-width / 2, -length / 2, width, length);
+
+        // Add border
+        ctx.strokeStyle =
+          element.id === selectedElement ? "#ff0000" : "rgba(0, 0, 0, 0.3)";
+        ctx.lineWidth =
+          element.id === selectedElement
+            ? Math.max(2, scale * 0.02)
+            : Math.max(1, scale * 0.01);
+        ctx.strokeRect(-width / 2, -length / 2, width, length);
+
+        // Add direction indicator
+        const arrowSize = Math.min(width, length) * 0.2;
+        ctx.beginPath();
+        ctx.moveTo(0, -length / 4);
+        ctx.lineTo(0, length / 4);
+        ctx.lineTo(-arrowSize / 2, length / 4 - arrowSize / 2);
+        ctx.moveTo(0, length / 4);
+        ctx.lineTo(arrowSize / 2, length / 4 - arrowSize / 2);
+        ctx.strokeStyle = "rgba(0, 0, 0, 0.5)";
+        ctx.lineWidth = Math.max(1, scale * 0.01);
+        ctx.stroke();
 
         ctx.restore();
+
+        // Draw label after restore to ensure it's not affected by rotation
+        ctx.save();
+        // Set font size relative to the furniture size but with a minimum size
+        const fontSize = Math.max(12, Math.min(width, length) * 0.15);
+        ctx.font = `${fontSize}px Arial`;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+
+        // Draw label background
+        const label = furnitureTemplate.name;
+        const metrics = ctx.measureText(label);
+        const padding = 6;
+        const labelWidth = metrics.width + padding * 2;
+        const labelHeight = fontSize + padding * 2;
+
+        // Position label above the furniture
+        const labelX = x;
+        const labelZ = z - length / 2 - 10; // Position above the furniture
+
+        // Draw background rectangle with rounded corners
+        ctx.fillStyle = "rgba(255, 255, 255, 0.9)";
+        ctx.strokeStyle = "rgba(0, 0, 0, 0.1)";
+        ctx.lineWidth = 1;
+        const radius = 4;
+
+        // Draw rounded rectangle
+        ctx.beginPath();
+        ctx.moveTo(labelX - labelWidth / 2 + radius, labelZ - labelHeight / 2);
+        ctx.lineTo(labelX + labelWidth / 2 - radius, labelZ - labelHeight / 2);
+        ctx.quadraticCurveTo(
+          labelX + labelWidth / 2,
+          labelZ - labelHeight / 2,
+          labelX + labelWidth / 2,
+          labelZ - labelHeight / 2 + radius
+        );
+        ctx.lineTo(labelX + labelWidth / 2, labelZ + labelHeight / 2 - radius);
+        ctx.quadraticCurveTo(
+          labelX + labelWidth / 2,
+          labelZ + labelHeight / 2,
+          labelX + labelWidth / 2 - radius,
+          labelZ + labelHeight / 2
+        );
+        ctx.lineTo(labelX - labelWidth / 2 + radius, labelZ + labelHeight / 2);
+        ctx.quadraticCurveTo(
+          labelX - labelWidth / 2,
+          labelZ + labelHeight / 2,
+          labelX - labelWidth / 2,
+          labelZ + labelHeight / 2 - radius
+        );
+        ctx.lineTo(labelX - labelWidth / 2, labelZ - labelHeight / 2 + radius);
+        ctx.quadraticCurveTo(
+          labelX - labelWidth / 2,
+          labelZ - labelHeight / 2,
+          labelX - labelWidth / 2 + radius,
+          labelZ - labelHeight / 2
+        );
+        ctx.closePath();
+
+        ctx.fill();
+        ctx.stroke();
+
+        // Draw text with a subtle shadow
+        ctx.shadowColor = "rgba(0, 0, 0, 0.2)";
+        ctx.shadowBlur = 2;
+        ctx.shadowOffsetX = 1;
+        ctx.shadowOffsetY = 1;
+        ctx.fillStyle = element.id === selectedElement ? "#ff0000" : "#000000";
+        ctx.fillText(label, labelX, labelZ);
+
+        // Reset shadow
+        ctx.shadowColor = "transparent";
+        ctx.restore();
+
+        // Log furniture details for debugging
+        console.log("Rendering furniture:", {
+          type: element.type,
+          template: furnitureTemplate.category,
+          dimensions: { width, length },
+          position: { x, z },
+          name: furnitureTemplate.name,
+        });
       });
+
+      // Helper function to adjust color brightness
+      function adjustColor(color: string, amount: number): string {
+        const hex = color.replace("#", "");
+        const r = Math.max(
+          0,
+          Math.min(255, parseInt(hex.substring(0, 2), 16) + amount)
+        );
+        const g = Math.max(
+          0,
+          Math.min(255, parseInt(hex.substring(2, 4), 16) + amount)
+        );
+        const b = Math.max(
+          0,
+          Math.min(255, parseInt(hex.substring(4, 6), 16) + amount)
+        );
+        return `#${r.toString(16).padStart(2, "0")}${g
+          .toString(16)
+          .padStart(2, "0")}${b.toString(16).padStart(2, "0")}`;
+      }
 
       // Add click handler for 2D view
       const handleClick = (event: MouseEvent) => {
@@ -560,22 +713,114 @@ const DesignViewer: React.FC<DesignViewerProps> = ({
           roomZ >= 0 &&
           roomZ <= design.room.length
         ) {
-          // Find clicked furniture
           let clickedElement: string | null = null;
-          design.elements.forEach((element) => {
-            const elementX = element.position.x * design.room.width * scale;
-            const elementZ = element.position.z * design.room.length * scale;
-            // Add click detection logic here
-            // ...
-          });
+
+          // Reverse loop through elements to check top-most first
+          for (let i = design.elements.length - 1; i >= 0; i--) {
+            const element = design.elements[i];
+            const furnitureTemplate = FURNITURE_CATALOG.find(
+              (f) => f.category.toLowerCase() === element.type
+            );
+            if (!furnitureTemplate) continue;
+
+            // Calculate furniture dimensions using the same scale as rendering
+            const width =
+              furnitureTemplate.defaultDimensions.width *
+              scale *
+              element.scale.x;
+            const length =
+              furnitureTemplate.defaultDimensions.length *
+              scale *
+              element.scale.z;
+
+            // Calculate center position using the same scale as rendering
+            const centerX =
+              (canvas.width - design.room.width * scale) / 2 +
+              element.position.x * design.room.width * scale;
+            const centerZ =
+              (canvas.height - design.room.length * scale) / 2 +
+              element.position.z * design.room.length * scale;
+
+            // Calculate relative click position
+            const relativeX = x - centerX;
+            const relativeZ = y - centerZ;
+
+            // Apply inverse rotation to click coordinates
+            const rotation = element.rotation.y;
+            const rotatedX =
+              relativeX * Math.cos(-rotation) - relativeZ * Math.sin(-rotation);
+            const rotatedZ =
+              relativeX * Math.sin(-rotation) + relativeZ * Math.cos(-rotation);
+
+            // Check if rotated point is within furniture bounds
+            if (
+              rotatedX >= -width / 2 &&
+              rotatedX <= width / 2 &&
+              rotatedZ >= -length / 2 &&
+              rotatedZ <= length / 2
+            ) {
+              clickedElement = element.id;
+              break;
+            }
+          }
           onElementSelect(clickedElement);
         }
       };
 
+      // Add rotation handler for selected furniture
+      const handleMouseMove = (event: MouseEvent) => {
+        if (!selectedElement || !design) return;
+
+        const selectedFurniture = design.elements.find(
+          (el) => el.id === selectedElement
+        );
+        if (!selectedFurniture) return;
+
+        const furnitureTemplate = FURNITURE_CATALOG.find(
+          (f) => f.category.toLowerCase() === selectedFurniture.type
+        );
+        if (!furnitureTemplate) return;
+
+        const rect = canvas.getBoundingClientRect();
+        const x = event.clientX - rect.left;
+        const y = event.clientY - rect.top;
+
+        // Calculate center of selected furniture
+        const width =
+          furnitureTemplate.defaultDimensions.width *
+          scale *
+          selectedFurniture.scale.x;
+        const length =
+          furnitureTemplate.defaultDimensions.length *
+          scale *
+          selectedFurniture.scale.z;
+        const centerX =
+          (canvas.width - design.room.width * scale) / 2 +
+          selectedFurniture.position.x * design.room.width * scale;
+        const centerZ =
+          (canvas.height - design.room.length * scale) / 2 +
+          selectedFurniture.position.z * design.room.length * scale;
+
+        // Check if mouse is near rotation handle
+        const handleX = centerX + width / 2;
+        const handleZ = centerZ + length / 2 - length / 2 - 25;
+        const distance = Math.sqrt(
+          Math.pow(x - handleX, 2) + Math.pow(y - handleZ, 2)
+        );
+
+        if (distance < 10) {
+          canvas.style.cursor = "pointer";
+        } else {
+          canvas.style.cursor = "default";
+        }
+      };
+
+      canvas.addEventListener("mousemove", handleMouseMove);
       canvas.addEventListener("click", handleClick);
 
       return () => {
         canvas.removeEventListener("click", handleClick);
+        canvas.removeEventListener("mousemove", handleMouseMove);
         cleanup();
       };
     }

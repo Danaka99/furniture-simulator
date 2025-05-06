@@ -17,27 +17,27 @@ const SAMPLE_FURNITURE: FurnitureItem[] = [
   {
     id: "modern-sofa",
     name: "Modern Sofa",
-    category: "Sofas",
+    category: "Sofa",
     price: 999.0,
     image: "/furniture/sofa.png",
   },
   {
     id: "coffee-table",
     name: "Coffee Table",
-    category: "Tables",
+    category: "Table",
     price: 299.0,
     image: "/furniture/table.png",
   },
   {
     id: "velvet-chair",
     name: "Velvet Chair",
-    category: "Chairs",
+    category: "Chair",
     price: 199.0,
     image: "/furniture/chair.png",
   },
 ];
 
-const CATEGORIES = ["All", "Tables", "Chairs", "Sofas"];
+const CATEGORIES = ["All", "Table", "Chair", "Sofa"];
 
 const FurnitureCatalog: React.FC<FurnitureCatalogProps> = ({
   onSelectFurniture,

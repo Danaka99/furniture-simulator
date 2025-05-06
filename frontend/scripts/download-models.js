@@ -9,23 +9,28 @@ const __dirname = path.dirname(__filename);
 const FURNITURE_CATALOG = [
   {
     name: "sofa",
-    url: "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/SheenChair/glTF-Binary/SheenChair.glb",
+    url: "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/GlamVelvetSofa/glTF-Binary/GlamVelvetSofa.glb",
+    targetPath: "sofa.glb",
   },
   {
     name: "table",
-    url: "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/AntiqueCamera/glTF-Binary/AntiqueCamera.glb",
+    url: "https://market-assets.fra1.cdn.digitaloceanspaces.com/market-assets/models/coffee-table/model.gltf",
+    targetPath: "table.glb",
   },
   {
     name: "chair",
-    url: "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/GlamVelvetSofa/glTF-Binary/GlamVelvetSofa.glb",
+    url: "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/SheenChair/glTF-Binary/SheenChair.glb",
+    targetPath: "chair.glb",
   },
   {
     name: "bed",
     url: "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/Duck/glTF-Binary/Duck.glb",
+    targetPath: "bed.glb",
   },
   {
     name: "cabinet",
     url: "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/Box/glTF-Binary/Box.glb",
+    targetPath: "cabinet.glb",
   },
 ];
 
@@ -75,10 +80,12 @@ async function downloadAllModels() {
   console.log("Models will be saved to:", MODELS_DIR);
 
   for (const furniture of FURNITURE_CATALOG) {
-    const filename = `${furniture.name}.glb`;
     console.log(`Downloading ${furniture.name} from ${furniture.url}...`);
     try {
-      await downloadFile(furniture.url, filename);
+      await downloadFile(furniture.url, furniture.targetPath);
+      console.log(
+        `Successfully downloaded ${furniture.name} to ${furniture.targetPath}`
+      );
     } catch (error) {
       console.error(`Error downloading ${furniture.name}:`, error.message);
     }
