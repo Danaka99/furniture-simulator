@@ -51,10 +51,7 @@ export const authService = {
     async signup(credentials: SignupCredentials) {
         try {
             const response = await authAxios.post('/auth/register', credentials);
-            if (response.data.token) {
-                localStorage.setItem('token', response.data.token);
-                localStorage.setItem('user', JSON.stringify(response.data.user));
-            }
+            // Don't store token after signup - user needs to login separately
             return response.data;
         } catch (error: any) {
             console.error('Signup error:', error.response?.data || error.message);

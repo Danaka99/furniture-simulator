@@ -25,6 +25,8 @@ const App: React.FC = () => {
       <AuthProvider>
         <CartProvider>
           <Routes>
+            {/* Redirect root path to login */}
+            <Route path="/" element={<Navigate to="/login" />} />
             <Route path="/login" element={<Login />} />
             <Route path="/signup" element={<SignUp />} />
             <Route

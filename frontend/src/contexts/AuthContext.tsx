@@ -37,8 +37,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const signup = async (credentials: SignupCredentials) => {
     const response = await authService.signup(credentials);
-    setUser(response);
-    setIsAuthenticated(true);
+    return response;
   };
 
   const logout = () => {
